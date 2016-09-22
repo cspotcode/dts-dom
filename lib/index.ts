@@ -367,6 +367,8 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
             case "alias":
             case "interface":
             case "class":
+            case "union":
+            case "intersection":
                 return true;
             default:
                 return false;
@@ -437,6 +439,20 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
         }
     }
 
+    function printWithinParens(t: Type) {
+        if (needsParens(t)) print('(');
+        writeReference(t);
+        if (needsParens(t)) print(')');
+    }
+
+    function printUnionType(members: Type[]) {
+        writeDelimited(members, ' | ', printWithinParens);
+        }
+
+    function printIntersectionType(members: Type[]) {
+        writeDelimited(members, ' & ', printWithinParens);
+    }
+
     function writeReference(d: Type) {
         if (typeof d === 'string') {
             print(d);
@@ -448,9 +464,7 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
                     break;
 
                 case "array":
-                    if (needsParens(e.type)) print('(');
-                    writeReference(e.type);
-                    if (needsParens(e.type)) print(')');
+                    printWithinParens(e.type);
                     print('[]');
                     break;
 
@@ -460,6 +474,14 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
 
                 case "object":
                     printObjectTypeMembers(e.members);
+                    break;
+
+                case "union":
+                    printUnionType(e.members);
+                    break;
+
+                case "intersection":
+                    printIntersectionType(e.members);
                     break;
 
                 default:
