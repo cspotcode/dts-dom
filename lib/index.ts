@@ -17,14 +17,24 @@ export interface Parameter {
     flags?: ParameterFlags;
 }
 
-export interface MethodDeclaration extends DeclarationBase {
+export interface TypeParameter {
+    kind: "typeparameter";
+    name: string;
+    extends?: Type;
+}
+
+export interface GenericType {
+    typeParameters: TypeParameter[];
+}
+
+export interface MethodDeclaration extends DeclarationBase, GenericType {
     kind: "method";
     name: string;
     parameters: Parameter[];
     returnType: Type;
 }
 
-export interface FunctionDeclaration extends DeclarationBase {
+export interface FunctionDeclaration extends DeclarationBase, GenericType {
     kind: "function";
     name: string;
     parameters: Parameter[];
@@ -36,7 +46,7 @@ export interface ConstructorDeclaration extends DeclarationBase {
     parameters: Parameter[];
 }
 
-export interface ClassDeclaration extends DeclarationBase {
+export interface ClassDeclaration extends DeclarationBase, GenericType {
     kind: "class";
     name: string;
     members: ClassMember[];
@@ -44,7 +54,7 @@ export interface ClassDeclaration extends DeclarationBase {
     baseType?: ObjectTypeReference;
 }
 
-export interface InterfaceDeclaration extends DeclarationBase {
+export interface InterfaceDeclaration extends DeclarationBase, GenericType {
     kind: "interface";
     name: string;
     members: ObjectTypeMember[];
@@ -83,7 +93,7 @@ export interface IntersectionType {
     members: Type[];
 }
 
-export interface TypeAliasDeclaration extends DeclarationBase {
+export interface TypeAliasDeclaration extends DeclarationBase, GenericType {
     kind: "alias";
     name: string;
     type: Type;
@@ -97,11 +107,12 @@ export interface ArrayTypeReference {
 export interface NamedTypeReference {
     kind: "name";
     name: string;
+    specializations: Type[];
 }
 
 export type PrimitiveType = "string" | "number" | "boolean" | "any" | "void" | "null" | "undefined" | "never";
 
-export type TypeReference = TopLevelDeclaration | NamedTypeReference | ArrayTypeReference | PrimitiveType;
+export type TypeReference = TopLevelDeclaration | NamedTypeReference | ArrayTypeReference | PrimitiveType | TypeParameter;
 
 export type ObjectTypeReference = ClassDeclaration | InterfaceDeclaration;
 export type ObjectTypeMember = PropertyDeclaration | MethodDeclaration;
@@ -135,6 +146,7 @@ export const create = {
             name,
             baseTypes: [],
             kind: "interface",
+            typeParameters: [],
             members: []
         };
     },
@@ -143,6 +155,7 @@ export const create = {
         return {
             kind: 'class',
             name,
+            typeParameters: [],
             members: [],
             implements: []
         };
@@ -158,6 +171,7 @@ export const create = {
     method(name: string, parameters: Parameter[], returnType: Type, flags = DeclarationFlags.None): MethodDeclaration {
         return {
             kind: "method",
+            typeParameters: [],
             name, parameters, returnType, flags
         };
     },
@@ -165,6 +179,7 @@ export const create = {
     function(name: string, parameters: Parameter[], returnType: Type): FunctionDeclaration {
         return {
             kind: "function",
+            typeParameters: [],
             name, parameters, returnType
         };
     },
@@ -214,7 +229,8 @@ export const create = {
     namedTypeReference(name: string): NamedTypeReference {
         return {
             kind: 'name',
-            name
+            name,
+            specializations: []
         };
     },
 
@@ -453,6 +469,28 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
         writeDelimited(members, ' & ', printWithinParens);
     }
 
+    function printTypeParameters(params: TypeParameter[]) {
+        if (params.length) {
+            print('<');
+            writeDelimited(params, ', ', param => {
+                print(param.name);
+                if (param.extends) {
+                    print(' extends ');
+                    writeReference(param.extends);
+                }
+            });
+            print('>');
+        }
+    }
+
+    function printTypeSpecializations(params: Type[]) {
+        if (params.length) {
+            print('<');
+            writeDelimited(params, ', ', writeReference);
+            print('>');
+        }
+    }
+
     function writeReference(d: Type) {
         if (typeof d === 'string') {
             print(d);
@@ -461,6 +499,7 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
             switch (e.kind) {
                 case "name":
                     print(e.name);
+                    printTypeSpecializations(e.specializations);
                     break;
 
                 case "array":
@@ -484,6 +523,10 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
                     printIntersectionType(e.members);
                     break;
 
+                case "typeparameter":
+                    print(e.name);
+                    break;
+
                 default:
                     throw new Error(`Unknown kind ${d.kind}`);
             }
@@ -493,7 +536,9 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
 
     function writeInterface(d: InterfaceDeclaration) {
         printDeclarationComments(d);
-        start(`interface ${d.name} `);
+        start(`interface ${d.name}`);
+        printTypeParameters(d.typeParameters);
+        print(' ');
         if (d.baseTypes && d.baseTypes.length) {
             print(`extends `);
             writeDelimited(d.baseTypes, ', ', writeReference);
@@ -509,7 +554,9 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
             newline();
         }
 
-        startWithDeclareOrExport(`function ${f.name}(`, f.flags);
+        startWithDeclareOrExport(`function ${f.name}`, f.flags);
+        printTypeParameters(f.typeParameters);
+        print('(');
 
         writeDelimited(f.parameters, ', ', writeParameter);
         print('): ');
@@ -541,7 +588,9 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
 
     function writeClass(c: ClassDeclaration) {
         printDeclarationComments(c);
-        startWithDeclareOrExport(`${classFlagsToString(c.flags)}class ${c.name} `, c.flags);
+        startWithDeclareOrExport(`${classFlagsToString(c.flags)}class ${c.name}`, c.flags);
+        printTypeParameters(c.typeParameters);
+        print(' ');
         if (c.baseType) {
             print('extends ');
             writeReference(c.baseType);
@@ -595,7 +644,9 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
 
     function writeMethodDeclaration(m: MethodDeclaration) {
         printDeclarationComments(m);
-        start(`${memberFlagsToString(m.flags)}${quoteIfNeeded(m.name)}(`);
+        start(`${memberFlagsToString(m.flags)}${quoteIfNeeded(m.name)}`);
+        printTypeParameters(m.typeParameters);
+        print('(');
         writeDelimited(m.parameters, ', ', writeParameter);
         print('): ');
         writeReference(m.returnType);
@@ -628,7 +679,9 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
 
     function writeAlias(a: TypeAliasDeclaration) {
         printDeclarationComments(a);
-        startWithDeclareOrExport(`type ${a.name} = `, a.flags);
+        startWithDeclareOrExport(`type ${a.name}`, a.flags);
+        printTypeParameters(a.typeParameters);
+        print(' = ');
         writeReference(a.type);
         print(';');
         newline();
