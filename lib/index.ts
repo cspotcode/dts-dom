@@ -627,7 +627,11 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
     }
 
     function writeAlias(a: TypeAliasDeclaration) {
-        throw new Error("NYI");
+        printDeclarationComments(a);
+        startWithDeclareOrExport(`type ${a.name} = `, a.flags);
+        writeReference(a.type);
+        print(';');
+        newline();
     }
 
     function writeExportEquals(e: ExportEqualsDeclaration) {
