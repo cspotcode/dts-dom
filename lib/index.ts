@@ -99,7 +99,7 @@ export interface NamedTypeReference {
     name: string;
 }
 
-export type PrimitiveType = "string" | "number" | "boolean" | "any" | "void";
+export type PrimitiveType = "string" | "number" | "boolean" | "any" | "void" | "null" | "undefined" | "never";
 
 export type TypeReference = TopLevelDeclaration | NamedTypeReference | ArrayTypeReference | PrimitiveType;
 
@@ -236,7 +236,10 @@ export const type = {
     number: <PrimitiveType>"number",
     boolean: <PrimitiveType>"boolean",
     any: <PrimitiveType>"any",
-    void: <PrimitiveType>"void"
+    void: <PrimitiveType>"void",
+    null: <PrimitiveType>"null",
+    undefined: <PrimitiveType>"undefined",
+    never: <PrimitiveType>"never"
 };
 
 export const reservedWords = ['abstract', 'await', 'boolean', 'break', 'byte', 'case',
