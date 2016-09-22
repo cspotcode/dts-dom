@@ -119,7 +119,8 @@ export enum DeclarationFlags {
     Static = 1 << 2,
     Optional = 1 << 3,
     Export = 1 << 4,
-    Abstract = 1 << 5
+    Abstract = 1 << 5,
+    Readonly = 1 << 6
 }
 
 export enum ParameterFlags {
@@ -333,6 +334,10 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
 
         if (flags & DeclarationFlags.Abstract) {
             out += 'abstract ';
+        }
+
+        if (flags & DeclarationFlags.Readonly) {
+            out += 'readonly ';
         }
 
         return out;
