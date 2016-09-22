@@ -474,12 +474,7 @@ export function emit(rootDecl: TopLevelDeclaration, rootFlags = ContextFlags.Non
         start(`interface ${d.name} `);
         if (d.baseTypes && d.baseTypes.length) {
             print(`extends `);
-            let first = true;
-            for (const baseType of d.baseTypes) {
-                if (!first) print(', ');
-                writeReference(baseType);
-                first = false;
-            }
+            writeDelimited(d.baseTypes, ', ', writeReference);
         }
         printObjectTypeMembers(d.members);
         newline();
